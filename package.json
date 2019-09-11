@@ -29,6 +29,7 @@
     "browserify": "browserify -s socketPouch client | ./bin/es3ify.js | derequire > dist/socket-pouch.client.js",
     "min": "uglifyjs dist/socket-pouch.client.js -mc > dist/socket-pouch.client.min.js",
     "dev": "browserify test/test.js > test/test-bundle.js && npm run dev-server",
+    "ci-dev": "nodemon --watch ./lib/ --exec 'npm run browserify'",
     "dev-server": "./bin/dev-server.js",
     "coverage": "npm test --coverage && istanbul check-coverage --lines 100 --function 100 --statements 100 --branches 100"
   },
@@ -59,6 +60,7 @@
     "jshint": "^2.10.2",
     "mkdirp": "^0.5.0",
     "mocha": "^6.2.0",
+    "nodemon": "^1.19.2",
     "phantomjs": "^1.9.20",
     "pouchdb-http-proxy": "^0.10.4",
     "pouchdb-legacy-utils": "^1.0.0",
