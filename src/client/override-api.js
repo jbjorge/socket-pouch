@@ -20,6 +20,7 @@ import _query from './api/_query';
 import _viewCleanup from './api/_viewCleanup';
 
 export default function(api, callback, sendMessage, sendBinaryMessage) {
+	api._remote = true;
 	api.type = getType;
 	api._id = getId(adapterFun, sendMessage);
 	api.compact = compact(adapterFun, sendMessage);

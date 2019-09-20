@@ -187,7 +187,6 @@ export default function SocketPouch(constructorOptions, callback) {
       return callback(new Error('this db was closed'));
     }
     let messageId = uuid();
-    console.log(type);
     log('send message', pouchInstance._socketId, messageId, type, args);
     pouchInstance._callbacks[messageId] = callback;
     let stringArgs = stringifyArgs(args);

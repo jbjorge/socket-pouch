@@ -267,6 +267,12 @@ function listen(options = {}) {
     socket.on('close', function () {
       log('closing socket', socket.id);
       socket.removeAllListeners();
+      options.onDisconnect(socket);
+    });
+    socket.on('disconnect', function() {
+      log('closing socket', socket.id);
+      socket.removeAllListeners();
+      options.onDisconnect(socket);
     });
     socket.on('error', function (err) {
       log('socket threw an error', err);
