@@ -2,7 +2,7 @@
 
 // From http://stackoverflow.com/questions/14967647/ (continues on next line)
 // encode-decode-image-with-base64-breaks-image (2013-04-21)
-module.exports = function (bin) {
+export default function (bin) {
   var length = bin.length;
   var buf = new ArrayBuffer(length);
   var arr = new Uint8Array(buf);

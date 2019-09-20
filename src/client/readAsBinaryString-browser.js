@@ -3,7 +3,7 @@
 var arrayBufferToBinaryString = require('./arrayBufferToBinaryString');
 
 // shim for browsers that don't support it
-module.exports = function (blob, callback) {
+export default function (blob, callback) {
   var reader = new FileReader();
   var hasBinaryString = typeof reader.readAsBinaryString === 'function';
   reader.onloadend = function (e) {

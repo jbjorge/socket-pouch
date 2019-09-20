@@ -36,7 +36,7 @@
  *   >>> Math.uuid(8, 16) // 8 character ID (base=16)
  *   "098F4D35"
  */
-var chars = (
+let chars = (
 '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ' +
 'abcdefghijklmnopqrstuvwxyz'
 ).split('');
@@ -45,8 +45,8 @@ function getValue(radix) {
 }
 function uuid(len, radix) {
   radix = radix || chars.length;
-  var out = '';
-  var i = -1;
+  let out = '';
+  let i = -1;
 
   if (len) {
     // Compact form

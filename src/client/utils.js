@@ -1,17 +1,17 @@
 'use strict';
 
-var utils = require('../shared/utils');
-var log = require('debug')('pouchdb:socket:client');
-var isBrowser = typeof process === 'undefined' || process.browser;
+let utils = require('../shared/utils');
+let log = require('debug')('pouchdb:socket:client');
+let isBrowser = typeof process === 'undefined' || process.browser;
 
-exports.preprocessAttachments = function preprocessAttachments(doc) {
+export function preprocessAttachments(doc) {
   if (!doc._attachments || !Object.keys(doc._attachments)) {
     return utils.Promise.resolve();
   }
 
-  var atts = doc._attachments;
+  let atts = doc._attachments;
   return utils.Promise.all(Object.keys(atts).map(function (key) {
-    var att = atts[key];
+    let att = atts[key];
     if (att.data && typeof att.data !== 'string') {
       if (isBrowser) {
         return new utils.Promise(function (resolve) {
@@ -25,25 +25,24 @@ exports.preprocessAttachments = function preprocessAttachments(doc) {
       }
     }
   }));
-};
+}
 
-var b64StringToBluffer =
-  require('./base64StringToBlobOrBuffer');
+let b64StringToBluffer = require('./base64StringToBlobOrBuffer');
 
-exports.readAttachmentsAsBlobOrBuffer = function (row) {
-  var atts = (row.doc && row.doc._attachments) ||
+export function readAttachmentsAsBlobOrBuffer(row) {
+  let atts = (row.doc && row.doc._attachments) ||
     (row.ok && row.ok._attachments);
   if (!atts) {
     return;
   }
   Object.keys(atts).forEach(function (filename) {
-    var att = atts[filename];
+    let att = atts[filename];
     att.data = b64StringToBluffer(att.data, att.content_type);
   });
-};
+}
 
-exports.stringifyArgs = function stringifyArgs(args) {
-  var funcArgs = ['filter', 'map', 'reduce'];
+export function stringifyArgs(args) {
+  let funcArgs = ['filter', 'map', 'reduce'];
   args.forEach(function (arg) {
     if (typeof arg === 'object' && arg !== null && !Array.isArray(arg)) {
       funcArgs.forEach(function (funcArg) {
@@ -57,35 +56,35 @@ exports.stringifyArgs = function stringifyArgs(args) {
     }
   });
   return JSON.stringify(args);
-};
+}
 
-exports.padInt = function padInt(i, len) {
-  var res = i.toString();
+export function padInt(i, len) {
+  let res = i.toString();
   while (res.length < len) {
     res = '0' + res;
   }
   return res;
-};
+}
 
 
-exports.adapterFun = function adapterFun(name, callback) {
+export function adapterFun(name, callback) {
 
   function logApiCall(self, name, args) {
     if (!log.enabled) {
       return;
     }
     // db.name was added in pouch 6.0.0
-    var dbName = self.name || self._db_name;
-    var logArgs = [dbName, name];
-    for (var i = 0; i < args.length - 1; i++) {
+    let dbName = self.name || self._db_name;
+    let logArgs = [dbName, name];
+    for (let i = 0; i < args.length - 1; i++) {
       logArgs.push(args[i]);
     }
     log.apply(null, logArgs);
 
     // override the callback itself to log the response
-    var origCallback = args[args.length - 1];
+    let origCallback = args[args.length - 1];
     args[args.length - 1] = function (err, res) {
-      var responseArgs = [dbName, name];
+      let responseArgs = [dbName, name];
       responseArgs = responseArgs.concat(
         err ? ['error', err] : ['success', res]
       );
@@ -99,7 +98,7 @@ exports.adapterFun = function adapterFun(name, callback) {
     if (this._closed) {
       return utils.Promise.reject(new Error('database is closed'));
     }
-    var self = this;
+    let self = this;
     logApiCall(self, name, args);
     if (!this.taskqueue.isReady) {
       return new utils.Promise(function (fulfill, reject) {
@@ -114,4 +113,4 @@ exports.adapterFun = function adapterFun(name, callback) {
     }
     return callback.apply(this, args);
   }));
-};
+}

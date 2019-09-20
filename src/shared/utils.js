@@ -1,10 +1,10 @@
 'use strict';
 
-var Promise = require('pouchdb-promise');
-var buffer = require('./buffer');
+let Promise = require('pouchdb-promise');
+let buffer = require('./buffer');
 
 exports.lastIndexOf = function lastIndexOf(str, char) {
-  for (var i = str.length - 1; i >= 0; i--) {
+  for (let i = str.length - 1; i >= 0; i--) {
     if (str.charAt(i) === char) {
       return i;
     }
@@ -18,7 +18,7 @@ exports.parseMessage = require('./parse-message');
 
 /* istanbul ignore next */
 exports.once = function once(fun) {
-  var called = false;
+  let called = false;
   return exports.getArguments(function (args) {
     if (called) {
       console.trace();
@@ -32,9 +32,9 @@ exports.once = function once(fun) {
 /* istanbul ignore next */
 exports.getArguments = function getArguments(fun) {
   return function () {
-    var len = arguments.length;
-    var args = new Array(len);
-    var i = -1;
+    let len = arguments.length;
+    let args = new Array(len);
+    let i = -1;
     while (++i < len) {
       args[i] = arguments[i];
     }
@@ -45,10 +45,10 @@ exports.getArguments = function getArguments(fun) {
 exports.toPromise = function toPromise(func) {
   //create the function we will be returning
   return exports.getArguments(function (args) {
-    var self = this;
-    var tempCB = (typeof args[args.length - 1] === 'function') ? args.pop() : false;
+    let self = this;
+    let tempCB = (typeof args[args.length - 1] === 'function') ? args.pop() : false;
     // if the last argument is a function, assume its a callback
-    var usedCB;
+    let usedCB;
     if (tempCB) {
       // if it was a callback, create a new callback which calls it,
       // but do so async so we don't trap any errors
@@ -58,9 +58,9 @@ exports.toPromise = function toPromise(func) {
         });
       };
     }
-    var promise = new Promise(function (fulfill, reject) {
+    let promise = new Promise(function (fulfill, reject) {
       try {
-        var callback = exports.once(function (err, mesg) {
+        let callback = exports.once(function (err, mesg) {
           if (err) {
             reject(err);
           } else {
@@ -94,7 +94,7 @@ if (typeof atob === 'function') {
   };
 } else {
   exports.atob = function atobShim(str) {
-    var base64 = new buffer(str, 'base64');
+    let base64 = new buffer(str, 'base64');
     // Node.js will just skip the characters it can't encode instead of
     // throwing and exception
     if (base64.toString('base64') !== str) {
@@ -117,7 +117,7 @@ if (typeof btoa === 'function') {
 exports.inherits = require('inherits');
 exports.Promise = Promise;
 
-var binUtil = require('pouchdb-binary-util');
+let binUtil = require('pouchdb-binary-util');
 
 exports.createBlob = binUtil.createBlob;
 exports.readAsArrayBuffer = binUtil.readAsArrayBuffer;

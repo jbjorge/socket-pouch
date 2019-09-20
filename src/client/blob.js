@@ -25,5 +25,5 @@ function createBlob(parts, properties) {
   }
 }
 
-module.exports = createBlob;
+export default createBlob;
 

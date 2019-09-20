@@ -1,4 +1,3 @@
-'use strict';
 export default function(getFunc) {
 	// hacky code necessary due to implicit breaking change in
 	// https://github.com/pouchdb/pouchdb/commits/0ddeae6b

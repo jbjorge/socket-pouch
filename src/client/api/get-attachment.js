@@ -1,4 +1,3 @@
-'use strict';
 export default function(adapterFun, sendMessage) {
 	return adapterFun('getAttachment', function(docId, attachmentId, opts, callback) {
 		if (typeof opts === 'function') {

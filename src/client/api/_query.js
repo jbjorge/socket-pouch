@@ -1,6 +1,4 @@
-'use strict';
-var clientUtils = require('../utils');
-var readAttachmentsAsBlobOrBuffer = clientUtils.readAttachmentsAsBlobOrBuffer;
+import { readAttachmentsAsBlobOrBuffer } from '../utils';
 
 export default function(adapterFun, sendMessage) {
 	return adapterFun('query', function(fun, opts, callback) {
@@ -8,7 +6,7 @@ export default function(adapterFun, sendMessage) {
 			callback = opts;
 			opts = {};
 		}
-		var funEncoded = fun;
+		let funEncoded = fun;
 		if (typeof fun === 'function') {
 			funEncoded = { map: fun };
 		}

@@ -1,7 +1,6 @@
-'use strict';
 export default function(adapterFun, sendMessage) {
 	return adapterFun('remove', function(docOrId, optsOrRev, opts, callback) {
-		var doc;
+		let doc;
 		if (typeof optsOrRev === 'string') {
 			// id, rev, opts, callback style
 			doc = {
@@ -23,7 +22,7 @@ export default function(adapterFun, sendMessage) {
 				opts = optsOrRev;
 			}
 		}
-		var rev = (doc._rev || opts.rev);
+		let rev = (doc._rev || opts.rev);
 
 		sendMessage('remove', [doc._id, rev], callback);
 	});

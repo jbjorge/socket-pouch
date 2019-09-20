@@ -2,6 +2,6 @@
 
 var binaryStringToBlobOrBuffer = require('./binaryStringToBlobOrBuffer');
 
-module.exports = function (b64, type) {
+export default function (b64, type) {
   return binaryStringToBlobOrBuffer(atob(b64), type);
 };

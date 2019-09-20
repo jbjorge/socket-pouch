@@ -1,15 +1,14 @@
 'use strict';
-var utils = require('../shared/utils');
-var uuid = require('./../shared/uuid');
-var clientUtils = require('../utils');
-var readAttachmentsAsBlobOrBuffer = clientUtils.readAttachmentsAsBlobOrBuffer;
+import utils from '../../shared/utils';
+import uuid from '../../shared/uuid';
+import { readAttachmentsAsBlobOrBuffer } from '../utils';
 
 export default function(sendMessage, api, callback) {
 	return function(opts) {
 		opts = utils.clone(opts);
 
 		if (opts.continuous) {
-			var messageId = uuid();
+			let messageId = uuid();
 			api._changesListeners[messageId] = {
 				listener: opts.onChange,
 				asBinary: opts.attachments && opts.binary

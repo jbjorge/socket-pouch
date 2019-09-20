@@ -1,33 +1,25 @@
 'use strict';
 
-var buffer = require('../shared/buffer');
+let buffer = require('../shared/buffer');
 
-/* istanbul ignore if */
-if (typeof atob === 'function') {
-  exports.atob = function (str) {
-    /* global atob */
-    return atob(str);
-  };
-} else {
-  exports.atob = function (str) {
-    var base64 = new buffer(str, 'base64');
-    // Node.js will just skip the characters it can't encode instead of
-    // throwing and exception
-    if (base64.toString('base64') !== str) {
-      throw ("Cannot base64 encode full string");
-    }
-    return base64.toString('binary');
-  };
+export function atob(str) {
+  if (typeof window.atob === 'function') {
+    return window.atob(str);
+  }
+  let base64 = new buffer(str, 'base64');
+  // Node.js will just skip the characters it can't encode instead of
+  // throwing and exception
+  if (base64.toString('base64') !== str) {
+    throw ("Cannot base64 encode full string");
+  }
+  return base64.toString('binary');
 }
 
-/* istanbul ignore if */
-if (typeof btoa === 'function') {
-  exports.btoa = function (str) {
-    /* global btoa */
-    return btoa(str);
-  };
-} else {
-  exports.btoa = function (str) {
-    return new buffer(str, 'binary').toString('base64');
-  };
+export function btoa(str) {
+  if (typeof window.btoa === 'function') {
+    return window.btoa(str);
+  }
+  return new buffer(str, 'binary').toString('base64');
 }
+
+export default { atob, btoa };

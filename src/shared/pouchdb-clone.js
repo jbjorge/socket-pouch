@@ -1,12 +1,12 @@
 'use strict';
 
-var isBinaryObject = require('./isBinaryObject');
-var cloneBinaryObject = require('./cloneBinaryObject');
+let isBinaryObject = require('./isBinaryObject');
+let cloneBinaryObject = require('./cloneBinaryObject');
 
 module.exports = function clone(object) {
-  var newObject;
-  var i;
-  var len;
+  let newObject;
+  let i;
+  let len;
 
   if (!object || typeof object !== 'object') {
     return object;
@@ -33,7 +33,7 @@ module.exports = function clone(object) {
   newObject = {};
   for (i in object) {
     if (Object.prototype.hasOwnProperty.call(object, i)) {
-      var value = clone(object[i]);
+      let value = clone(object[i]);
       if (typeof value !== 'undefined') {
         newObject[i] = value;
       }

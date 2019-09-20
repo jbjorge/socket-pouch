@@ -1,8 +1,8 @@
-var utils = require('../shared/utils');
+let utils = require('../shared/utils');
 
-module.exports = function(options) {
+export default function(options) {
 	if (typeof options === 'string') {
-		var slashIdx = utils.lastIndexOf(options, '/');
+		let slashIdx = utils.lastIndexOf(options, '/');
 		return {
 			url: options.substring(0, slashIdx),
 			name: options.substring(slashIdx + 1)

@@ -1,6 +1,4 @@
-'use strict';
-var clientUtils = require('../utils');
-var readAttachmentsAsBlobOrBuffer = clientUtils.readAttachmentsAsBlobOrBuffer;
+import { readAttachmentsAsBlobOrBuffer } from '../utils';
 
 export default function(adapterFun, sendMessage) {
 	return adapterFun('get', function(id, opts, callback) {

@@ -1,129 +1,98 @@
-'use strict';
-
-var utils = require('../shared/utils');
-var clientUtils = require('./utils');
-var uuid = require('./../shared/uuid');
-var errors = require('../shared/errors');
-var log = require('debug')('pouchdb:socket:client');
-var Socket = require('socket.io-client');
-var blobUtil = require('blob-util');
-var isBrowser = typeof process === 'undefined' || process.browser;
-var buffer = require('../shared/buffer');
-var preprocessAttachments = clientUtils.preprocessAttachments;
-var stringifyArgs = clientUtils.stringifyArgs;
-var padInt = clientUtils.padInt;
-var readAttachmentsAsBlobOrBuffer = clientUtils.readAttachmentsAsBlobOrBuffer;
-var adapterFun = clientUtils.adapterFun;
-var readAsBinaryString = require('./readAsBinaryString');
-var isBinaryObject = require('../shared/isBinaryObject');
-var Promise = require('pouchdb-promise');
-var base64 = require('./base64');
-var getOptions = require('./get-options');
-var overrideApi = require('./override-api');
-
-var instances = {};
-var socketInstance = {};
-
-function close(api, callback) {
-  // api.name was added in pouchdb 6.0.0
-  log('closing socket', api._socketId, api.name || api._name);
-
-  function closeSocket() {
-    api._socket.closed = true;
-    api._socket.once('close', function (msg) {
-      log('socket closed', api._socketId, msg);
-      api._socket.removeAllListeners();
-      callback();
-    });
-    api._socket.close();
-  }
-
-  if (api._socket.closed) {
-    return callback();
-  }
-  closeSocket();
-}
+import utils from '../shared/utils';
+import {
+  stringifyArgs,
+  padInt,
+  readAttachmentsAsBlobOrBuffer,
+  adapterFun
+} from './utils';
+import uuid from './../shared/uuid';
+import createDebugLog from 'debug';
+import Socket from 'socket.io-client';
+import blobUtil from 'blob-util';
+import buffer from '../shared/buffer';
+import getOptions from './get-options';
+import getSocketName from './api/get-socket-name';
+import overrideApi from './override-api';
+const isBrowser = typeof process === 'undefined' || process.browser;
+const log = createDebugLog('pouchdb:socket:client');
+const sockets = {};
 
 // Implements the PouchDB API for dealing with CouchDB instances over WS
-function SocketPouch(options, callback) {
-  log('constructor called', opts);
-  var api = this;
-  var opts = getOptions(options);
+export default function SocketPouch(constructorOptions, callback) {
+  let api = this;
+  let instanceOptions = getOptions(constructorOptions);
+  log('constructor called', instanceOptions);
 
-  if (!opts.url || !opts.name) {
+  if (!instanceOptions.url || !instanceOptions.name) {
     return callback(new Error('Error: you must provide a web socket url and database name.'));
   }
 
-  var cacheKey = '$' + api._socketName;
+  function useExistingSocket(cachedAPI, callback) {
+    log("REUSED SOCKET!!!!! :D :D :D");
+    api._socket = cachedAPI._socket;
+    api._callbacks = cachedAPI._callbacks;
+    api._changesListeners = cachedAPI._changesListeners;
+    api._blobs = cachedAPI._blobs;
+    api._binaryMessages = cachedAPI._binaryMessages;
+    api._name = cachedAPI._name;
 
-  function useExistingSocket() {
-    // Re-use the cached one instead of creating multiple sockets.
-    // This is important, because if a user creates many PouchDBs
-    // without closing/destroying each one, then we could end up
-    // with too many open sockets, which causes problems like
-    // https://github.com/Automattic/engine.io/issues/320
-    var instance = instances[cacheKey];
-    api._socket = instance._socket;
-    api._callbacks = instance._callbacks;
-    api._changesListeners = instance._changesListeners;
-    api._blobs = instance._blobs;
-    api._binaryMessages = instance._binaryMessages;
-    api._name = instance._name;
-
-    if (instance._socketId) {
-      api._socketId = instance._socketId;
-      process.nextTick(function () {
+    if (cachedAPI._socketId) {
+      api._socketId = cachedAPI._socketId;
+      process.nextTick(function() {
         callback(null, api);
       });
     } else {
-      api._socket.on('connect', function () {
+      api._socket.on('connect', function() {
         api._socketId = api._socket.id;
-        process.nextTick(function () {
+        process.nextTick(function() {
           callback(null, api);
         });
       });
     }
   }
 
-  function createNewSocket() {
-    console.log('Creating new socket!');
+  function createNewSocket(options, callback) {
+    log("NEW SOCKET!!!!!!!!!!!!!!!!!!!!!!!!!");
     // to force XHR during debugging
-    // opts.socketOptions = {transports: ['polling']};
-    var socket = api._socket = new Socket(opts.url, opts.socketOptions || {});
+    // options.socketOptions = {transports: ['polling']};
+    let socket = api._socket = new Socket(options.url, options.socketOptions || {});
     socket.binaryType = 'blob';
     api._callbacks = {};
     api._changesListeners = {};
     api._blobs = {};
     api._binaryMessages = {};
     api._name = api._socketName;
-    instances[cacheKey] = api;
 
-    socket.on('connect', function () {
+    socket.on('connect', function() {
       api._socketId = socket.id;
       log('socket opened', api._socketId, api._name);
 
-      if (opts.connectionEmitters) {
-        opts.connectionEmitters.map(function (emitter) {
+      if (options.connectionEmitters) {
+        options.connectionEmitters.map(function(emitter) {
           socket.emit(emitter.name, emitter.value)
         });
       }
 
-      var serverOpts = {
+      let serverOpts = {
         name: api._name,
-        auto_compaction: !!opts.auto_compaction
+        auto_compaction: !!options.auto_compaction
       };
-      if ('revs_limit' in opts) {
-        serverOpts.revs_limit = opts.revs_limit;
+      if ('revs_limit' in options) {
+        serverOpts.revs_limit = options.revs_limit;
       }
-      sendMessage('createDatabase', [serverOpts], function (err) {
-        if (err) {
-          return callback(err);
-        }
+      if (options.skip_setup) {
         callback(null, api);
-      });
+      } else {
+        sendMessage('createDatabase', [serverOpts], function(err) {
+          if (err) {
+            return callback(err);
+          }
+          callback(null, api);
+        });
+      }
     });
 
-    api._socket.on('error', function (err) {
+    api._socket.on('error', function(err) {
       callback(err);
     });
 
@@ -142,17 +111,17 @@ function SocketPouch(options, callback) {
     }
 
     function receiveMessage(res) {
-      var split = utils.parseMessage(res, 3);
-      var messageId = split[0];
-      var messageType = split[1];
-      var content = JSON.parse(split[2]);
+      let split = utils.parseMessage(res, 3);
+      let messageId = split[0];
+      let messageType = split[1];
+      let content = JSON.parse(split[2]);
 
       if (messageType === '4') { // unhandled error
         handleUncaughtError(content);
         return;
       }
 
-      var cb = api._callbacks[messageId];
+      let cb = api._callbacks[messageId];
 
       if (!cb) {
         log('duplicate message (ignoring)', messageId, messageType, content);
@@ -189,13 +158,13 @@ function SocketPouch(options, callback) {
 
     function receiveBlob(blob) {
       if (isBrowser) {
-        blobUtil.blobToBinaryString(blob.slice(0, 36)).then(function (uuid) {
+        blobUtil.blobToBinaryString(blob.slice(0, 36)).then(function(uuid) {
           api._blobs[uuid] = blob.slice(36);
           log('receiveBlob', uuid);
           checkBinaryReady(uuid);
         }).catch(console.log.bind(console));
       } else {
-        var uuid = blob.slice(0, 36).toString('utf8');
+        let uuid = blob.slice(0, 36).toString('utf8');
         log('receiveBlob', uuid);
         api._blobs[uuid] = blob.slice(36);
         checkBinaryReady(uuid);
@@ -208,15 +177,15 @@ function SocketPouch(options, callback) {
         return;
       }
       log('receive full binary message', uuid);
-      var blob = api._blobs[uuid];
-      var msg = api._binaryMessages[uuid];
+      let blob = api._blobs[uuid];
+      let msg = api._binaryMessages[uuid];
 
       delete api._blobs[uuid];
       delete api._binaryMessages[uuid];
 
-      var blobToDeliver;
+      let blobToDeliver;
       if (isBrowser) {
-        blobToDeliver = blobUtil.createBlob([blob], {type: msg.contentType});
+        blobToDeliver = blobUtil.createBlob([blob], { type: msg.contentType });
       } else {
         blobToDeliver = blob;
         blob.type = msg.contentType; // non-standard, but we do it for the tests
@@ -225,12 +194,14 @@ function SocketPouch(options, callback) {
       msg.cb(null, blobToDeliver);
     }
 
-    api._socket.on('message', function (res) {
+    api._socket.on('message', function(res) {
       if (typeof res !== 'string') {
         return receiveBlob(res);
       }
       receiveMessage(res);
     });
+
+    return api;
   }
 
   function sendMessage(type, args, callback) {
@@ -239,19 +210,19 @@ function SocketPouch(options, callback) {
     } else if (api._closed) {
       return callback(new Error('this db was closed'));
     }
-    var messageId = uuid();
+    let messageId = uuid();
     log('send message', api._socketId, messageId, type, args);
     api._callbacks[messageId] = callback;
-    var stringArgs = stringifyArgs(args);
-    api._socket.send(type + ':' + messageId + ':' + stringArgs, function () {
+    let stringArgs = stringifyArgs(args);
+    api._socket.send(type + ':' + messageId + ':' + stringArgs, function() {
       log('message sent', api._socketId, messageId);
     });
   }
 
   function sendBinaryMessage(type, args, blobIndex, blob, callback) {
-    var messageId = uuid();
+    let messageId = uuid();
     api._callbacks[messageId] = callback;
-    var header = {
+    let header = {
       args: args,
       blobIndex: blobIndex,
       messageId: messageId,
@@ -259,9 +230,9 @@ function SocketPouch(options, callback) {
     };
 
     log('send binary message', api._socketId, messageId, header);
-    var headerString = JSON.stringify(header);
-    var headerLen = padInt(headerString.length, 16);
-    var blobToSend;
+    let headerString = JSON.stringify(header);
+    let headerLen = padInt(headerString.length, 16);
+    let blobToSend;
     if (isBrowser) {
       blobToSend = blobUtil.createBlob([
         headerLen,
@@ -275,28 +246,84 @@ function SocketPouch(options, callback) {
         new buffer(blob, 'binary')
       ]);
     }
-    api._socket.send( blobToSend, function () {
+    api._socket.send(blobToSend, function() {
       log('binary message sent', api._socketId, messageId);
     });
   }
 
+  api._close = function(callback) {
+    api._closed = true;
+    if (!sockets[instanceOptions.url]) { // already closed/destroyed
+      return callback();
+    }
+    delete sockets[instanceOptions.url];
+    close(api, callback);
+  };
+
+  api.destroy = adapterFun('destroy', function(opts, callback) {
+    if (typeof opts === 'function') {
+      callback = opts;
+      opts = {};
+    }
+
+    if (!sockets[instanceOptions.url]) { // already closed/destroyed
+      return callback(null, { ok: true });
+    }
+    delete sockets[instanceOptions.url];
+    sendMessage('destroy', [], function(err, res) {
+      if (err) {
+        api.emit('error', err);
+        return callback(err);
+      }
+      api._destroyed = true;
+      close(api, function(err) {
+        if (err) {
+          api.emit('error', err);
+          return callback(err);
+        }
+        api.emit('destroyed');
+        callback(null, res);
+      });
+    });
+  });
+
+  api._socketName = getSocketName(api, instanceOptions);
+
   overrideApi(api, callback, sendMessage, sendBinaryMessage);
 
-  if (instances[cacheKey]) {
-    useExistingSocket();
-  } else { // new DB
-    createNewSocket();
+  if (sockets[instanceOptions.url]) {
+    useExistingSocket(sockets[instanceOptions.url], instanceOptions, callback);
+  } else {
+    sockets[instanceOptions.url] = createNewSocket(instanceOptions, callback);
   }
 }
 
 // SocketPouch is a valid adapter.
-SocketPouch.valid = function () {
+SocketPouch.valid = function() {
   return true;
 };
 
-module.exports = SocketPouch;
+function close(api, callback) {
+  // api.name was added in pouchdb 6.0.0
+  log('closing socket', api._socketId, api.name || api._name);
+
+  function closeSocket() {
+    api._socket.closed = true;
+    api._socket.once('close', function(msg) {
+      log('socket closed', api._socketId, msg);
+      api._socket.removeAllListeners();
+      callback();
+    });
+    api._socket.close();
+  }
+
+  if (api._socket.closed) {
+    return callback();
+  }
+  closeSocket();
+}
 
 /* istanbul ignore next */
 if (typeof window !== 'undefined' && window.PouchDB) {
-  window.PouchDB.adapter('socket', module.exports);
+  window.PouchDB.adapter('socket', SocketPouch);
 }

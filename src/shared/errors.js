@@ -1,6 +1,6 @@
 "use strict";
 
-var inherits = require('inherits');
+let inherits = require('inherits');
 inherits(PouchError, Error);
 
 function PouchError(opts) {
@@ -161,7 +161,7 @@ exports.error = function (error, reason, name) {
     // inherit error properties from our parent error manually
     // so as to allow proper JSON parsing.
     /* jshint ignore:start */
-    for (var p in error) {
+    for (let p in error) {
       if (typeof error[p] !== 'function') {
         this[p] = error[p];
       }
@@ -184,21 +184,21 @@ exports.error = function (error, reason, name) {
 // This is for differentiating between errors with the same name and status,
 // eg, bad_request.
 exports.getErrorTypeByProp = function (prop, value, reason) {
-  var errors = exports;
-  var keys = Object.keys(errors).filter(function (key) {
-    var error = errors[key];
+  let errors = exports;
+  let keys = Object.keys(errors).filter(function (key) {
+    let error = errors[key];
     return typeof error !== 'function' && error[prop] === value;
   });
-  var key = reason && keys.filter(function (key) {
-      var error = errors[key];
+  let key = reason && keys.filter(function (key) {
+      let error = errors[key];
       return error.message === reason;
     })[0] || keys[0];
   return (key) ? errors[key] : null;
 };
 
 exports.generateErrorFromResponse = function (res) {
-  var error, errName, errType, errMsg, errReason;
-  var errors = exports;
+  let error, errName, errType, errMsg, errReason;
+  let errors = exports;
 
   errName = (res.error === true && typeof res.name === 'string') ?
     res.name :

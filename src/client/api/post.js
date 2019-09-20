@@ -1,5 +1,4 @@
-'use strict';
-var utils = require('../../shared/utils');
+import utils from '../../shared/utils';
 
 export default function(adapterFun, sendMessage) {
 	return adapterFun('post', function(doc, opts, callback) {

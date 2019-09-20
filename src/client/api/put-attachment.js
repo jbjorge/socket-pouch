@@ -1,8 +1,7 @@
-'use strict';
-var utils = require('../../shared/utils');
-var errors = require('../../shared/errors');
-var isBrowser = typeof process === 'undefined' || process.browser;
-var BufferWrapper = require('../../shared/buffer');
+import utils from '../../shared/utils';
+import errors from '../../shared/errors';
+import BufferWrapper from '../../shared/buffer';
+const isBrowser = typeof process === 'undefined' || process.browser;
 
 // Add the attachment given by blob and its contentType property
 // to the document with the given id, the revision given by rev, and
@@ -22,7 +21,7 @@ export default function(adapterFun, sendBinaryMessage) {
 		}
 
 		if (typeof blob === 'string') {
-			var binary;
+			let binary;
 			try {
 				binary = utils.atob(blob);
 			} catch (err) {
@@ -36,7 +35,7 @@ export default function(adapterFun, sendBinaryMessage) {
 			}
 		}
 
-		var args = [docId, attachmentId, rev, null, type];
+		let args = [docId, attachmentId, rev, null, type];
 		sendBinaryMessage('putAttachment', args, 3, blob, callback);
 	});
 }
