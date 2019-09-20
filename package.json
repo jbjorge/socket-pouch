@@ -23,7 +23,7 @@
   "scripts": {
     "test-node": "bash ./bin/test-node.sh",
     "test-browser": "./bin/test-browser.js",
-    "jshint": "jshint -c .jshintrc lib test/test.js",
+    "lint": "eslint lib test/test.js",
     "test": "npm run jshint && ./bin/run-test.sh",
     "build": "mkdirp dist && npm run browserify && npm run min",
     "browserify": "browserify -s socketPouch client | ./bin/es3ify.js | derequire > dist/socket-pouch.client.js",
@@ -38,6 +38,7 @@
     "blob-util": "^1.1.1",
     "bluebird": "^2.9.24",
     "debug": "^2.1.3",
+    "eslint": "^6.4.0",
     "eval": "^0.1.0",
     "inherits": "^2.0.1",
     "lie": "^2.6.0",
@@ -48,7 +49,6 @@
     "socket.io-client": "^2.0.1"
   },
   "devDependencies": {
-    "browserify": "^16.5.0",
     "chai": "3.5.0",
     "chai-as-promised": "^5.1.0",
     "corsproxy": "^0.2.14",
@@ -57,7 +57,6 @@
     "es5-shim": "^4.1.1",
     "http-server": "^0.11.1",
     "istanbul": "^0.2.16",
-    "jshint": "^2.10.2",
     "mkdirp": "^0.5.0",
     "mocha": "^6.2.0",
     "nodemon": "^1.19.2",
@@ -68,8 +67,9 @@
     "sauce-connect-launcher": "^1.2.7",
     "selenium-standalone": "^6.16.0",
     "uglify-js": "^2.4.13",
-    "watchify": "^3.1.0",
-    "wd": "^1.11.3"
+    "wd": "^1.11.3",
+    "webpack": "^4.40.2",
+    "webpack-cli": "^3.3.9"
   },
   "browser": {
     "./lib/shared/buffer.js": "./lib/shared/buffer-browser.js",
