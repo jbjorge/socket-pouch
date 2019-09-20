@@ -1,21 +1,18 @@
 'use strict';
 
-var socketIO = require('socket.io');
-var Promise = require('bluebird');
-var uuid = require('../shared/uuid');
-var errors = require('../shared/errors');
-var utils = require('../shared/utils');
-var serverUtils = require('./utils');
-var safeEval = require('./safe-eval');
-var makePouchCreator = require('./make-pouch-creator');
-var dbs = {};
-var allChanges = {};
+let socketIO = require('socket.io');
+let uuid = require('../shared/uuid');
+let errors = require('../shared/errors');
+let utils = require('../shared/utils');
+let serverUtils = require('./utils');
+let safeEval = require('./safe-eval');
+let allChanges = {};
 
-var log = require('debug')('pouchdb:socket:server');
+let log = require('debug')('pouchdb:socket:server');
 
 function destringifyArgs(argsString) {
-  var args = JSON.parse(argsString);
-  var funcArgs = ['filter', 'map', 'reduce'];
+  let args = JSON.parse(argsString);
+  let funcArgs = ['filter', 'map', 'reduce'];
   args.forEach(function (arg) {
     if (typeof arg === 'object' && arg !== null && !Array.isArray(arg)) {
       funcArgs.forEach(function (funcArg) {
@@ -47,7 +44,7 @@ function sendSuccess(socket, messageId, data) {
 
 function sendBinarySuccess(socket, messageId, type, buff) {
   log(' -> sendBinarySuccess', socket.id, messageId);
-  var blobUuid = uuid();
+  let blobUuid = uuid();
   socket.send(messageId + ':3:' + JSON.stringify({type: type, uuid: blobUuid}));
   socket.send(Buffer.concat([
     new Buffer(blobUuid, 'utf8'),
@@ -59,26 +56,18 @@ function sendUpdate(socket, messageId, data) {
   socket.send(messageId + ':2:' + JSON.stringify(data));
 }
 
-function dbMethod(socket, methodName, messageId, args) {
+function dbMethod(socket, db, methodName, messageId, args) {
   log(methodName, messageId, args);
-  var db = dbs['$' + socket.id];
   if (!db) {
     return sendError(socket, messageId, {error: 'db not found'});
   }
-  Promise.resolve().then(function () {
-    return db;
-  }).then(function (res) {
-    var db = res.pouch;
-    return db[methodName].apply(db, args);
-  }).then(function (res) {
-    sendSuccess(socket, messageId, res);
-  }).catch(function (err) {
-    sendError(socket, messageId, err);
-  });
+  return db[methodName].apply(db, args)
+    .then(res => sendSuccess(socket, messageId, res))
+    .catch(err => sendError(socket, messageId, err));
 }
 
-function changes(socket, messageId, args) {
-  var opts = args[0];
+function changes(socket, db, messageId, args) {
+  let opts = args[0];
   if (opts && typeof opts === 'object') {
     // just send all the docs anyway because we need to emit change events
     // TODO: be smarter about emitting changes without building up an array
@@ -87,98 +76,79 @@ function changes(socket, messageId, args) {
     // just send binary as base64 and decode on the client
     opts.binary = false;
   }
-  dbMethod(socket, 'changes', messageId, args);
+  dbMethod(socket, db, 'changes', messageId, args);
 }
 
-function possiblyBinaryDbMethod(socket, methodName, messageId, args) {
-  var opts = args[args.length - 1];
+function possiblyBinaryDbMethod(socket, db, methodName, messageId, args) {
+  let opts = args[args.length - 1];
   if (opts && typeof opts === 'object') {
     // just send binary as base64 and decode on the client
     opts.binary = false;
   }
-  dbMethod(socket, methodName, messageId, args);
+  dbMethod(socket, db, methodName, messageId, args);
 }
 
-function getAttachment(socket, messageId, args) {
-  var db = dbs['$' + socket.id];
+function getAttachment(socket, db, messageId, args) {
   if (!db) {
     return sendError(socket, messageId, {error: 'db not found'});
   }
 
-  Promise.resolve().then(function () {
-    return db;
-  }).then(function (res) {
-    var db = res.pouch;
-    var docId = args[0];
-    var attId = args[1];
-    var opts = args[2];
-    if (typeof opts !== 'object') {
-      opts = {};
-    }
-    return db.get(docId, opts).then(function (doc) {
+  let docId = args[0];
+  let attId = args[1];
+  let opts = args[2];
+  if (typeof opts !== 'object') {
+    opts = {};
+  }
+  return db.get(docId, opts)
+    .then(doc => {
       if (!doc._attachments || !doc._attachments[attId]) {
         throw errors.MISSING_DOC;
       }
-      var type = doc._attachments[attId].content_type;
-      return db.getAttachment.apply(db, args).then(function (buff) {
-        sendBinarySuccess(socket, messageId, type, buff);
-      });
-    });
-  }).catch(function (err) {
-    sendError(socket, messageId, err);
-  });
+      let type = doc._attachments[attId].content_type;
+      return db.getAttachment.apply(db, args)
+        .then(buff => {
+          sendBinarySuccess(socket, messageId, type, buff);
+        });
+    })
+    .catch(err => sendError(socket, messageId, err));
 }
 
-function destroy(socket, messageId, args) {
-  var key = '$' + socket.id;
-  var db = dbs[key];
+function destroy(socket, db, messageId, args) {
   if (!db) {
     return sendError(socket, messageId, {error: 'db not found'});
   }
-  delete dbs[key];
 
-  Promise.resolve().then(function () {
-    return db;
-  }).then(function (res) {
-    var db = res.pouch;
-    return db.destroy.apply(db, args);
-  }).then(function (res) {
-    sendSuccess(socket, messageId, res);
-  }).catch(function (err) {
-    sendError(socket, messageId, err);
-  });
+  return db.destroy.apply(db, args)
+    .then(res => sendSuccess(socket, messageId, res))
+    .catch(err => sendError(socket, messageId, err));
 }
 
-function liveChanges(socket, messageId, args) {
-  var db = dbs['$' + socket.id];
+function liveChanges(socket, db, messageId, args) {
   if (!db) {
     return sendError(socket, messageId, {error: 'db not found'});
   }
-  Promise.resolve().then(function () {
-    return db;
-  }).then(function (res) {
-    var db = res.pouch;
-    var opts = args[0] || {};
-    // just send binary as base64 and decode on the client
-    opts.binary = false;
-    var changes = db.changes(opts);
-    allChanges[messageId] = changes;
-    changes.on('change', function (change) {
-      sendUpdate(socket, messageId, change);
-    }).on('complete', function (change) {
+  let opts = args[0] || {};
+  // just send binary as base64 and decode on the client
+  opts.binary = false;
+  let changes = db.changes(opts);
+  allChanges[messageId] = changes;
+  changes.on('change', function (change) {
+    sendUpdate(socket, messageId, change);
+  })
+    .on('complete', function (change) {
       changes.removeAllListeners();
       delete allChanges[messageId];
       sendSuccess(socket, messageId, change);
-    }).on('error', function (change) {
+    })
+    .on('error', function (change) {
       changes.removeAllListeners();
       delete allChanges[messageId];
       sendError(socket, messageId, change);
     });
-  });
 }
 
 function cancelChanges(messageId) {
-  var changes = allChanges[messageId];
+  let changes = allChanges[messageId];
   if (changes) {
     changes.cancel();
   }
@@ -192,9 +162,7 @@ function addUncaughtErrorHandler(db, socket) {
   });
 }
 
-function createDatabase(socket, messageId, args, pouchCreator) {
-  var key = '$' + socket.id;
-  var db = dbs[key];
+function createDatabase(socket, db, messageId, args) {
   if (db) {
     return sendError(socket, messageId, {
       error: "file_exists",
@@ -202,7 +170,7 @@ function createDatabase(socket, messageId, args, pouchCreator) {
     });
   }
 
-  var name = typeof args[0] === 'string' ? args[0] : args[0].name;
+  let name = typeof args[0] === 'string' ? args[0] : args[0].name;
 
   if (!name) {
     return sendError(socket, messageId, {
@@ -210,19 +178,16 @@ function createDatabase(socket, messageId, args, pouchCreator) {
     });
   }
 
-  db = dbs[key] = pouchCreator(args);
-  addUncaughtErrorHandler(db, socket).then(function () {
-    sendSuccess(socket, messageId, {ok: true});
-  }).catch(function (err) {
-    sendError(socket, messageId, err);
-  });
+  addUncaughtErrorHandler(db, socket)
+    .then(() => sendSuccess(socket, messageId, {ok: true}))
+    .catch(err => sendError(socket, messageId, err));
 }
 
-function onReceiveMessage(socket, type, messageId, args, pouchCreator) {
+function onReceiveMessage(socket, db, type, messageId, args) {
   log('onReceiveMessage', type, socket.id, messageId, args);
   switch (type) {
     case 'createDatabase':
-      return createDatabase(socket, messageId, args, pouchCreator);
+      return createDatabase(socket, db, messageId, args);
     case 'id':
       sendSuccess(socket, messageId, socket.id);
       return;
@@ -236,74 +201,76 @@ function onReceiveMessage(socket, type, messageId, args, pouchCreator) {
     case 'viewCleanup':
     case 'removeAttachment':
     case 'putAttachment':
-      return dbMethod(socket, type, messageId, args);
+      return dbMethod(socket, db, type, messageId, args);
     case 'get':
     case 'query':
     case 'allDocs':
-      return possiblyBinaryDbMethod(socket, type, messageId, args);
+      return possiblyBinaryDbMethod(socket, db, type, messageId, args);
     case 'changes':
-      return changes(socket, messageId, args);
+      return changes(socket, db, messageId, args);
     case 'getAttachment':
-      return getAttachment(socket, messageId, args);
+      return getAttachment(socket, db, messageId, args);
     case 'liveChanges':
-      return liveChanges(socket, messageId, args);
+      return liveChanges(socket, db, messageId, args);
     case 'cancelChanges':
-      return cancelChanges(messageId);
+      return cancelChanges(db, messageId);
     case 'destroy':
-      return destroy(socket, messageId, args);
+      return destroy(socket, db, messageId, args);
     default:
       return sendError(socket, messageId, {error: 'unknown API method: ' + type});
   }
 }
 
-function onReceiveTextMessage(message, socket, pouchCreator) {
+function onReceiveTextMessage(message, socket, db) {
   try {
-    var split = utils.parseMessage(message, 3);
-    var type = split[0];
-    var messageId = split[1];
-    var args = destringifyArgs(split[2]);
-    onReceiveMessage(socket, type, messageId, args, pouchCreator);
+    let split = utils.parseMessage(message, 3);
+    let type = split[0];
+    let messageId = split[1];
+    let args = destringifyArgs(split[2]);
+    onReceiveMessage(socket, db, type, messageId, args);
   } catch (err) {
     log('invalid message, ignoring', err);
   }
 }
 
-function onReceiveBinaryMessage(message, socket) {
+function onReceiveBinaryMessage(message, socket, db) {
   try {
-    var headerLen = parseInt(message.slice(0, 16).toString('utf8'), 10);
-    var header = JSON.parse(message.slice(16, 16 + headerLen).toString('utf8'));
-    var body = message.slice(16 + headerLen);
+    let headerLen = parseInt(message.slice(0, 16).toString('utf8'), 10);
+    let header = JSON.parse(message.slice(16, 16 + headerLen).toString('utf8'));
+    let body = message.slice(16 + headerLen);
     header.args[header.blobIndex] = body;
-    onReceiveMessage(socket, header.messageType, header.messageId, header.args);
+    onReceiveMessage(socket, db, header.messageType, header.messageId, header.args);
   } catch (err) {
     log('invalid message, ignoring', err);
   }
 }
 
 function listen(options = {}) {
-  var server = options.server ? (socketIO(options.server)) : (socketIO());
+  let server = options.server ? (socketIO(options.server)) : (socketIO());
   if (!options.server) {
     server.listen(options.port, options.socketOptions || {});
   }
 
+
   server.on('connection', function(socket) {
-    const pouchCreator = makePouchCreator(options, socket, server);
+    const pouchdb = require('pouchdb');
+    const onMessage = options.onConnection(socket, pouchdb);
 
     socket.on('message', function (message) {
-      if (typeof message !== 'string') {
-        return onReceiveBinaryMessage(message, socket);
+      const db = onMessage(message);
+      const messageWithoutDb = message.split(':').slice(1).join(':');
+      if (typeof messageWithoutDb !== 'string') {
+        return onReceiveBinaryMessage(messageWithoutDb, socket, db);
       }
-      onReceiveTextMessage(message, socket, pouchCreator);
+      onReceiveTextMessage(messageWithoutDb, socket, db);
     });
     socket.on('close', function () {
       log('closing socket', socket.id);
       socket.removeAllListeners();
-      delete dbs['$' + socket.id];
     });
     socket.on('error', function (err) {
       log('socket threw an error', err);
       socket.removeAllListeners();
-      delete dbs['$' + socket.id];
     });
   });
 

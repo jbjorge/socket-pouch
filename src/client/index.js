@@ -11,7 +11,6 @@ import Socket from 'socket.io-client';
 import blobUtil from 'blob-util';
 import buffer from '../shared/buffer';
 import getOptions from './get-options';
-import getSocketName from './api/get-socket-name';
 import overrideApi from './override-api';
 const isBrowser = typeof process === 'undefined' || process.browser;
 const log = createDebugLog('pouchdb:socket:client');
@@ -19,53 +18,30 @@ const sockets = {};
 
 // Implements the PouchDB API for dealing with CouchDB instances over WS
 export default function SocketPouch(constructorOptions, callback) {
-  let api = this;
-  let instanceOptions = getOptions(constructorOptions);
+  const pouchInstance = this;
+  const instanceOptions = getOptions(constructorOptions);
   log('constructor called', instanceOptions);
 
   if (!instanceOptions.url || !instanceOptions.name) {
     return callback(new Error('Error: you must provide a web socket url and database name.'));
   }
 
-  function useExistingSocket(cachedAPI, callback) {
-    log("REUSED SOCKET!!!!! :D :D :D");
-    api._socket = cachedAPI._socket;
-    api._callbacks = cachedAPI._callbacks;
-    api._changesListeners = cachedAPI._changesListeners;
-    api._blobs = cachedAPI._blobs;
-    api._binaryMessages = cachedAPI._binaryMessages;
-    api._name = cachedAPI._name;
-
-    if (cachedAPI._socketId) {
-      api._socketId = cachedAPI._socketId;
-      process.nextTick(function() {
-        callback(null, api);
-      });
-    } else {
-      api._socket.on('connect', function() {
-        api._socketId = api._socket.id;
-        process.nextTick(function() {
-          callback(null, api);
-        });
-      });
+  function getSocketInstance(options, callback) {
+    pouchInstance._callbacks = {};
+    pouchInstance._changesListeners = {};
+    pouchInstance._blobs = {};
+    pouchInstance._binaryMessages = {};
+    pouchInstance._name = pouchInstance.name || instanceOptions.originalName;
+    let socket = pouchInstance._socket = sockets[instanceOptions.url];
+    if (!socket) {
+      sockets[instanceOptions.url] = new Socket(options.url, options.socketOptions || {});
+      sockets[instanceOptions.url].binaryType = 'blob';
+      pouchInstance._socket = socket = sockets[instanceOptions.url];
     }
-  }
-
-  function createNewSocket(options, callback) {
-    log("NEW SOCKET!!!!!!!!!!!!!!!!!!!!!!!!!");
-    // to force XHR during debugging
-    // options.socketOptions = {transports: ['polling']};
-    let socket = api._socket = new Socket(options.url, options.socketOptions || {});
-    socket.binaryType = 'blob';
-    api._callbacks = {};
-    api._changesListeners = {};
-    api._blobs = {};
-    api._binaryMessages = {};
-    api._name = api._socketName;
 
     socket.on('connect', function() {
-      api._socketId = socket.id;
-      log('socket opened', api._socketId, api._name);
+      pouchInstance._socketId = socket.id;
+      log('socket opened', pouchInstance._socketId, pouchInstance._name);
 
       if (options.connectionEmitters) {
         options.connectionEmitters.map(function(emitter) {
@@ -73,32 +49,32 @@ export default function SocketPouch(constructorOptions, callback) {
         });
       }
 
-      let serverOpts = {
-        name: api._name,
-        auto_compaction: !!options.auto_compaction
-      };
-      if ('revs_limit' in options) {
-        serverOpts.revs_limit = options.revs_limit;
-      }
-      if (options.skip_setup) {
-        callback(null, api);
+      if (instanceOptions.skip_setup) {
+        callback(null, pouchInstance);
       } else {
+        let serverOpts = {
+          name: pouchInstance._name,
+          auto_compaction: !!options.auto_compaction
+        };
+        if ('revs_limit' in options) {
+          serverOpts.revs_limit = options.revs_limit;
+        }
         sendMessage('createDatabase', [serverOpts], function(err) {
           if (err) {
             return callback(err);
           }
-          callback(null, api);
+          callback(null, pouchInstance);
         });
       }
     });
 
-    api._socket.on('error', function(err) {
+    pouchInstance._socket.on('error', function(err) {
       callback(err);
     });
 
     function handleUncaughtError(content) {
       try {
-        api.emit('error', content);
+        pouchInstance.emit('error', content);
       } catch (err) {
         // TODO: it's weird that adapters should have to handle this themselves
         console.error(
@@ -121,35 +97,35 @@ export default function SocketPouch(constructorOptions, callback) {
         return;
       }
 
-      let cb = api._callbacks[messageId];
+      let cb = pouchInstance._callbacks[messageId];
 
       if (!cb) {
         log('duplicate message (ignoring)', messageId, messageType, content);
         return;
       }
 
-      log('receive message', api._socketId, messageId, messageType, content);
+      log('receive message', pouchInstance._socketId, messageId, messageType, content);
 
       if (messageType === '0') { // error
-        delete api._callbacks[messageId];
+        delete pouchInstance._callbacks[messageId];
         cb(content);
       } else if (messageType === '1') { // success
-        delete api._callbacks[messageId];
+        delete pouchInstance._callbacks[messageId];
         cb(null, content);
       } else if (messageType === '2') { // update, i.e. changes
-        if (api._changesListeners[messageId].asBinary) {
+        if (pouchInstance._changesListeners[messageId].asBinary) {
           readAttachmentsAsBlobOrBuffer(content);
         }
-        api._changesListeners[messageId].listener(content);
+        pouchInstance._changesListeners[messageId].listener(content);
       } else { // binary success
-        delete api._callbacks[messageId];
+        delete pouchInstance._callbacks[messageId];
         receiveBinaryMessage(content, cb);
       }
     }
 
     function receiveBinaryMessage(content, cb) {
       log('receiveBinaryMessage', content.uuid);
-      api._binaryMessages[content.uuid] = {
+      pouchInstance._binaryMessages[content.uuid] = {
         contentType: content.type,
         cb: cb
       };
@@ -159,29 +135,29 @@ export default function SocketPouch(constructorOptions, callback) {
     function receiveBlob(blob) {
       if (isBrowser) {
         blobUtil.blobToBinaryString(blob.slice(0, 36)).then(function(uuid) {
-          api._blobs[uuid] = blob.slice(36);
+          pouchInstance._blobs[uuid] = blob.slice(36);
           log('receiveBlob', uuid);
           checkBinaryReady(uuid);
         }).catch(console.log.bind(console));
       } else {
         let uuid = blob.slice(0, 36).toString('utf8');
         log('receiveBlob', uuid);
-        api._blobs[uuid] = blob.slice(36);
+        pouchInstance._blobs[uuid] = blob.slice(36);
         checkBinaryReady(uuid);
       }
     }
 
     // binary messages come in two parts; wait until we've received both
     function checkBinaryReady(uuid) {
-      if (!(uuid in api._blobs && uuid in api._binaryMessages)) {
+      if (!(uuid in pouchInstance._blobs && uuid in pouchInstance._binaryMessages)) {
         return;
       }
       log('receive full binary message', uuid);
-      let blob = api._blobs[uuid];
-      let msg = api._binaryMessages[uuid];
+      let blob = pouchInstance._blobs[uuid];
+      let msg = pouchInstance._binaryMessages[uuid];
 
-      delete api._blobs[uuid];
-      delete api._binaryMessages[uuid];
+      delete pouchInstance._blobs[uuid];
+      delete pouchInstance._binaryMessages[uuid];
 
       let blobToDeliver;
       if (isBrowser) {
@@ -194,34 +170,35 @@ export default function SocketPouch(constructorOptions, callback) {
       msg.cb(null, blobToDeliver);
     }
 
-    api._socket.on('message', function(res) {
+    pouchInstance._socket.on('message', function(res) {
       if (typeof res !== 'string') {
         return receiveBlob(res);
       }
       receiveMessage(res);
     });
 
-    return api;
+    return pouchInstance;
   }
 
   function sendMessage(type, args, callback) {
-    if (api._destroyed) {
+    if (pouchInstance._destroyed) {
       return callback(new Error('this db was destroyed'));
-    } else if (api._closed) {
+    } else if (pouchInstance._closed) {
       return callback(new Error('this db was closed'));
     }
     let messageId = uuid();
-    log('send message', api._socketId, messageId, type, args);
-    api._callbacks[messageId] = callback;
+    console.log(type);
+    log('send message', pouchInstance._socketId, messageId, type, args);
+    pouchInstance._callbacks[messageId] = callback;
     let stringArgs = stringifyArgs(args);
-    api._socket.send(type + ':' + messageId + ':' + stringArgs, function() {
-      log('message sent', api._socketId, messageId);
+    pouchInstance._socket.send(pouchInstance.name + ':' + type + ':' + messageId + ':' + stringArgs, function() {
+      log('message sent', pouchInstance._socketId, messageId);
     });
   }
 
   function sendBinaryMessage(type, args, blobIndex, blob, callback) {
     let messageId = uuid();
-    api._callbacks[messageId] = callback;
+    pouchInstance._callbacks[messageId] = callback;
     let header = {
       args: args,
       blobIndex: blobIndex,
@@ -229,7 +206,7 @@ export default function SocketPouch(constructorOptions, callback) {
       messageType: type
     };
 
-    log('send binary message', api._socketId, messageId, header);
+    log('send binary message', pouchInstance._socketId, messageId, header);
     let headerString = JSON.stringify(header);
     let headerLen = padInt(headerString.length, 16);
     let blobToSend;
@@ -246,21 +223,21 @@ export default function SocketPouch(constructorOptions, callback) {
         new buffer(blob, 'binary')
       ]);
     }
-    api._socket.send(blobToSend, function() {
-      log('binary message sent', api._socketId, messageId);
+    pouchInstance._socket.send(pouchInstance + ':' + blobToSend, function() {
+      log('binary message sent', pouchInstance._socketId, messageId);
     });
   }
 
-  api._close = function(callback) {
-    api._closed = true;
+  pouchInstance._close = function(callback) {
+    pouchInstance._closed = true;
     if (!sockets[instanceOptions.url]) { // already closed/destroyed
       return callback();
     }
     delete sockets[instanceOptions.url];
-    close(api, callback);
+    close(pouchInstance, callback);
   };
 
-  api.destroy = adapterFun('destroy', function(opts, callback) {
+  pouchInstance.destroy = adapterFun('destroy', function(opts, callback) {
     if (typeof opts === 'function') {
       callback = opts;
       opts = {};
@@ -272,30 +249,25 @@ export default function SocketPouch(constructorOptions, callback) {
     delete sockets[instanceOptions.url];
     sendMessage('destroy', [], function(err, res) {
       if (err) {
-        api.emit('error', err);
+        pouchInstance.emit('error', err);
         return callback(err);
       }
-      api._destroyed = true;
-      close(api, function(err) {
+      pouchInstance._destroyed = true;
+      close(pouchInstance, function(err) {
         if (err) {
-          api.emit('error', err);
+          pouchInstance.emit('error', err);
           return callback(err);
         }
-        api.emit('destroyed');
+        pouchInstance.emit('destroyed');
         callback(null, res);
       });
     });
   });
 
-  api._socketName = getSocketName(api, instanceOptions);
+  overrideApi(pouchInstance, callback, sendMessage, sendBinaryMessage);
 
-  overrideApi(api, callback, sendMessage, sendBinaryMessage);
-
-  if (sockets[instanceOptions.url]) {
-    useExistingSocket(sockets[instanceOptions.url], instanceOptions, callback);
-  } else {
-    sockets[instanceOptions.url] = createNewSocket(instanceOptions, callback);
-  }
+  // this is the thing that sets up the whole shebang
+  getSocketInstance(instanceOptions, callback);
 }
 
 // SocketPouch is a valid adapter.
@@ -303,21 +275,21 @@ SocketPouch.valid = function() {
   return true;
 };
 
-function close(api, callback) {
-  // api.name was added in pouchdb 6.0.0
-  log('closing socket', api._socketId, api.name || api._name);
+function close(pouchInstance, callback) {
+  // pouchInstance.name was added in pouchdb 6.0.0
+  log('closing socket', pouchInstance._socketId, pouchInstance.name || pouchInstance._name);
 
   function closeSocket() {
-    api._socket.closed = true;
-    api._socket.once('close', function(msg) {
-      log('socket closed', api._socketId, msg);
-      api._socket.removeAllListeners();
+    pouchInstance._socket.closed = true;
+    pouchInstance._socket.once('close', function(msg) {
+      log('socket closed', pouchInstance._socketId, msg);
+      pouchInstance._socket.removeAllListeners();
       callback();
     });
-    api._socket.close();
+    pouchInstance._socket.close();
   }
 
-  if (api._socket.closed) {
+  if (pouchInstance._socket.closed) {
     return callback();
   }
   closeSocket();

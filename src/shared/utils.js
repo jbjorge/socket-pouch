@@ -2,6 +2,8 @@
 
 let Promise = require('pouchdb-promise');
 let buffer = require('./buffer');
+if (Promise.default) { Promise = Promise.default; }
+if (buffer.default) { buffer = buffer.default; }
 
 exports.lastIndexOf = function lastIndexOf(str, char) {
   for (let i = str.length - 1; i >= 0; i--) {
@@ -12,9 +14,9 @@ exports.lastIndexOf = function lastIndexOf(str, char) {
   return -1;
 };
 
-exports.clone = require('./pouchdb-clone');
+exports.clone = require('./pouchdb-clone').default || require('./pouchdb-clone');
 
-exports.parseMessage = require('./parse-message');
+exports.parseMessage = require('./parse-message').default || require('./parse-message');
 
 /* istanbul ignore next */
 exports.once = function once(fun) {
@@ -114,10 +116,10 @@ if (typeof btoa === 'function') {
   };
 }
 
-exports.inherits = require('inherits');
+exports.inherits = require('inherits').default || require('inherits');
 exports.Promise = Promise;
 
-let binUtil = require('pouchdb-binary-util');
+let binUtil = require('pouchdb-binary-util').default || require('pouchdb-binary-util');
 
 exports.createBlob = binUtil.createBlob;
 exports.readAsArrayBuffer = binUtil.readAsArrayBuffer;

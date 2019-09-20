@@ -2,6 +2,8 @@
 
 let isBinaryObject = require('./isBinaryObject');
 let cloneBinaryObject = require('./cloneBinaryObject');
+if (isBinaryObject.default) { isBinaryObject = isBinaryObject.default; }
+if (cloneBinaryObject.default) { cloneBinaryObject = cloneBinaryObject.default; }
 
 module.exports = function clone(object) {
   let newObject;

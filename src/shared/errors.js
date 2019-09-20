@@ -1,6 +1,7 @@
 "use strict";
 
 let inherits = require('inherits');
+if (inherits.default) { inherits = inherits.default; }
 inherits(PouchError, Error);
 
 function PouchError(opts) {
