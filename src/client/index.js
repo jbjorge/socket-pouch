@@ -37,9 +37,12 @@ export default function SocketPouch(constructorOptions, callback) {
       sockets[instanceOptions.url] = new Socket(options.url, options.socketOptions || {});
       sockets[instanceOptions.url].binaryType = 'blob';
       pouchInstance._socket = socket = sockets[instanceOptions.url];
+      socket.on('connect', onConnected);
+    } else {
+      onConnected();
     }
 
-    socket.on('connect', function() {
+    function onConnected() {
       pouchInstance._socketId = socket.id;
       log('socket opened', pouchInstance._socketId, pouchInstance._name);
 
@@ -66,7 +69,7 @@ export default function SocketPouch(constructorOptions, callback) {
           callback(null, pouchInstance);
         });
       }
-    });
+    }
 
     pouchInstance._socket.on('error', function(err) {
       callback(err);
