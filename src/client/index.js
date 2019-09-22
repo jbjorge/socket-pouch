@@ -103,7 +103,7 @@ export default function SocketPouch(constructorOptions, callback) {
       let cb = pouchInstance._callbacks[messageId];
 
       if (!cb) {
-        log('duplicate message (ignoring)', messageId, messageType, content);
+        log('duplicate message or message to different db (ignoring)', messageId, messageType, content);
         return;
       }
 
