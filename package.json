@@ -29,7 +29,7 @@
     "coverage": "npm test --coverage && istanbul check-coverage --lines 100 --function 100 --statements 100 --branches 100",
     "lint": "eslint lib test/test.js",
     "ci:build": "webpack --watch --mode development",
-    "build": "run-s build:clean build:prepare build:js",
+    "build": "NODE_ENV=production run-s build:clean build:prepare build:js",
     "build:js": "webpack --mode production",
     "build:clean": "rimraf ./dist/",
     "build:prepare": "mkdirp dist"
