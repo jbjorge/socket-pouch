@@ -79,6 +79,7 @@
     "lib",
     "client",
     "server",
-    "dist"
+    "dist",
+    "src"
   ]
 }
