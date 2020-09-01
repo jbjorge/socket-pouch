@@ -3,6 +3,7 @@
   "version": "2.0.0",
   "description": "PouchDB over websockets",
   "main": "server/index.js",
+  "module": "src/client/index.js",
   "repository": {
     "type": "git",
     "url": "git://github.com/nolanlawson/socket-pouch.git"
@@ -23,14 +24,15 @@
   "scripts": {
     "test-node": "bash ./bin/test-node.sh",
     "test-browser": "./bin/test-browser.js",
-    "jshint": "jshint -c .jshintrc lib test/test.js",
     "test": "npm run jshint && ./bin/run-test.sh",
-    "build": "mkdirp dist && npm run browserify && npm run min",
-    "browserify": "browserify -s socketPouch client | ./bin/es3ify.js | derequire > dist/socket-pouch.client.js",
     "min": "uglifyjs dist/socket-pouch.client.js -mc > dist/socket-pouch.client.min.js",
-    "dev": "browserify test/test.js > test/test-bundle.js && npm run dev-server",
-    "dev-server": "./bin/dev-server.js",
-    "coverage": "npm test --coverage && istanbul check-coverage --lines 100 --function 100 --statements 100 --branches 100"
+    "coverage": "npm test --coverage && istanbul check-coverage --lines 100 --function 100 --statements 100 --branches 100",
+    "lint": "eslint lib test/test.js",
+    "ci:build": "webpack --watch --mode development",
+    "build": "run-s build:clean build:prepare build:js",
+    "build:js": "webpack --mode production",
+    "build:clean": "rimraf ./dist/",
+    "build:prepare": "mkdirp dist"
   },
   "dependencies": {
     "argsarray": "0.0.1",
@@ -47,40 +49,37 @@
     "socket.io-client": "^2.0.1"
   },
   "devDependencies": {
-    "browserify": "^16.5.0",
     "chai": "3.5.0",
     "chai-as-promised": "^5.1.0",
     "corsproxy": "^0.2.14",
     "derequire": "^2.0.0",
     "es3ify": "^0.1.3",
     "es5-shim": "^4.1.1",
+    "eslint": "^6.4.0",
+    "eslint-loader": "^3.0.0",
     "http-server": "^0.11.1",
     "istanbul": "^0.2.16",
-    "jshint": "^2.10.2",
     "mkdirp": "^0.5.0",
     "mocha": "^6.2.0",
+    "nodemon": "^1.19.2",
+    "npm-run-all": "^4.1.5",
     "phantomjs": "^1.9.20",
     "pouchdb-http-proxy": "^0.10.4",
     "pouchdb-legacy-utils": "^1.0.0",
     "request": "^2.36.0",
+    "rimraf": "^3.0.0",
     "sauce-connect-launcher": "^1.2.7",
     "selenium-standalone": "^6.16.0",
     "uglify-js": "^2.4.13",
-    "watchify": "^3.1.0",
-    "wd": "^1.11.3"
-  },
-  "browser": {
-    "./lib/shared/buffer.js": "./lib/shared/buffer-browser.js",
-    "./lib/shared/cloneBinaryObject.js": "./lib/shared/cloneBinaryObject-browser.js",
-    "./lib/shared/isBinaryObject.js": "./lib/shared/isBinaryObject-browser.js",
-    "./lib/client/base64StringToBlobOrBuffer.js": "./lib/client/base64StringToBlobOrBuffer-browser.js",
-    "./lib/client/binaryStringToBlobOrBuffer.js": "./lib/client/binaryStringToBlobOrBuffer-browser.js",
-    "./lib/client/readAsBinaryString.js": "./lib/client/readAsBinaryString-browser.js"
+    "wd": "^1.11.3",
+    "webpack": "^4.40.2",
+    "webpack-cli": "^3.3.9"
   },
   "files": [
     "lib",
     "client",
     "server",
-    "dist"
+    "dist",
+    "src"
   ]
 }

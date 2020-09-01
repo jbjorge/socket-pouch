@@ -1,0 +1,42 @@
+'use strict';
+import { adapterFun } from './utils';
+import getId from './api/get-id';
+import getType from './api/get-type';
+import compact from './api/compact';
+import info from './api/info';
+import get from './api/get';
+import _get from './api/_get';
+import remove from './api/remove';
+import getAttachment from './api/get-attachment';
+import removeAttachment from './api/remove-attachment';
+import putAttachment from './api/put-attachment';
+import put from './api/put';
+import post from './api/post';
+import _bulkDocs from './api/_bulkDocs';
+import _allDocs from './api/_allDocs';
+import _changes from './api/_changes';
+import revsDiff from './api/revsDiff';
+import _query from './api/_query';
+import _viewCleanup from './api/_viewCleanup';
+
+export default function(api, callback, sendMessage, sendBinaryMessage) {
+	api._remote = true;
+	api.type = getType;
+	api._id = getId(adapterFun, sendMessage);
+	api.compact = compact(adapterFun, sendMessage);
+	api._info = info.bind(null, sendMessage);
+	api.get = get(adapterFun, sendMessage);
+	api._get = _get(api.get);
+	api.remove = remove(adapterFun, sendMessage);
+	api.getAttachment = getAttachment(adapterFun, sendMessage);
+	api.removeAttachment = removeAttachment(adapterFun, sendMessage);
+	api.putAttachment = putAttachment(adapterFun, sendBinaryMessage);
+	api.put = put(adapterFun, sendMessage);
+	api.post = post(adapterFun, sendMessage);
+	api._bulkDocs = _bulkDocs(sendMessage);
+	api._allDocs = _allDocs(sendMessage);
+	api._changes = _changes(sendMessage, api, callback);
+	api.revsDiff = revsDiff(adapterFun, sendMessage);
+	api._query = _query(adapterFun, sendMessage);
+	api._viewCleanup = _viewCleanup(adapterFun, sendMessage);
+}
